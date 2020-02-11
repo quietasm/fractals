@@ -1,3 +1,5 @@
+// FractalDemo.java
+
 import java.awt.BorderLayout;
 import java.awt.Dimension;
 import java.awt.Graphics;
@@ -10,6 +12,7 @@ import javax.swing.JFrame;
 import javax.swing.JPanel;
 import javax.swing.JComboBox;
 import javax.swing.JOptionPane;
+import javax.swing.JLabel;
 import java.util.ArrayList;
 import java.util.NoSuchElementException;
 
@@ -20,36 +23,41 @@ public class FractalDemo extends JFrame
 
    public FractalDemo()
    {
-      super( "Fractal Demo" );
+      super("Fractal Demo");
 
-      fractalBox = new JComboBox( Fractals.getNames() );
-      fractalBox.addItemListener( new ItemListener() {
-            public void itemStateChanged( ItemEvent event ) {
-               if( event.getStateChange() == ItemEvent.SELECTED ) {
+      fractalBox = new JComboBox(Fractals.getNames());
+      fractalBox.addItemListener(new ItemListener() {
+            public void itemStateChanged(ItemEvent event) {
+               if(event.getStateChange() == ItemEvent.SELECTED) {
                   //JOptionPane.showMessageDialog( null, String.format(
                   //      "Item #%d", fractalBox.getSelectedIndex() ) );
                   int id = fractalBox.getSelectedIndex();
-                  Fractal currentFractal = Fractals.getFractal( id );
-                  fractalPanel.setImage( currentFractal.getImage() );
+                  Fractal currentFractal = Fractals.getFractal(id);
+                  fractalPanel.setImage(currentFractal.getImage());
                   fractalPanel.repaint();
                }
             }
          }
       );
-      add( fractalBox, BorderLayout.NORTH );
+      add(fractalBox, BorderLayout.NORTH);
 
       fractalPanel = new FractalPanel();
-      fractalPanel.setImage( Fractals.getFractal( 0 ).getImage() );
-      add( fractalPanel, BorderLayout.CENTER );
+      fractalPanel.setImage(Fractals.getFractal(0).getImage());
+      add(fractalPanel, BorderLayout.CENTER);
 
+      JLabel copyright =
+         new JLabel("2018-2020 (c) Горобейко В.С.", JLabel.CENTER);
+      add(copyright, BorderLayout.SOUTH);
+
+      setResizable(false);
       pack();
    } // end constructor FractalDemo
 
    public static void main( String[] args )
    {
       JFrame app = new FractalDemo();
-      app.setDefaultCloseOperation( JFrame.EXIT_ON_CLOSE );
-      app.setVisible( true );
+      app.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+      app.setVisible(true);
    } // end main
 } // end class FractalDemo
 
@@ -92,6 +100,8 @@ class FractalInfo
 {
    public static final int NONE = 0;
    public static final int GEOMETRIC = 1;
+   public static final int MANDELBROT = 2;
+   public static final int NEWTON = 3;
 
    private String fractalName;
    private int fractalType;
@@ -403,9 +413,9 @@ class Fractals
    static {
       fractals = new ArrayList< FractalInfo >();
 
-      fractals.add( new GeometricFractalInfo( "Кривая Коха", "60",
+      fractals.add( new GeometricFractalInfo( "Кривая Кох", "60",
             "F:F-F++F-F" ) );
-      fractals.add( new GeometricFractalInfo( "Снежинка Коха", "60",
+      fractals.add( new GeometricFractalInfo( "Снежинка Кох", "60",
             ":F++F++F;F:F-F++F-F" ) );
       fractals.add( new GeometricFractalInfo( "Фрактал 3", "120",
             ":F+F+F;F:F-F+F" ) );
@@ -453,8 +463,10 @@ class Fractals
             ":FXF--FF--FF;F:FF;X:--FXF++FXF++FXF--" ) );
       fractals.add( new GeometricFractalInfo( "Ковёр Серпинского", "90",
             ":F;F:FFF[+FFF+FFF+FFF]" ) );
-      //fractals.add( new FractalInfo( "Множество Мандельброта" ) );
-      //fractals.add( new FractalInfo( "Крест Ньютона" ) );
+      fractals.add( new FractalInfo( "Множество Мандельброта",
+            FractalInfo.MANDELBROT ) );
+      fractals.add( new FractalInfo( "Крест Ньютона",
+            FractalInfo.NEWTON ) );
    }
 
    public static String[] getNames()
@@ -468,10 +480,184 @@ class Fractals
    public static Fractal getFractal( int id )
    {
       FractalInfo info = fractals.get( id );
-      if( info.getType() == FractalInfo.GEOMETRIC )
-      {
+      if(info.getType() == FractalInfo.GEOMETRIC) {
          return new GeometricFractal( 400, 400, (GeometricFractalInfo) info );
+      } else if(info.getType() == FractalInfo.MANDELBROT) {
+         return new MandelbrotFractal(400, 400, -2.2, 1, -1.2, 1.2);
+      } else if(info.getType() == FractalInfo.NEWTON) {
+         return new NewtonFractal(400, 400);
       }
       return new DummyFractal();
    }
 } // end class Fractals
+
+class Complex
+{
+   private double Re, Im;
+
+   public Complex() {
+      this(0,0);
+   }
+
+   public Complex(Complex c) {
+      this(c.Re, c.Im);
+   }
+
+   public Complex(double re, double im) {
+      Re = re;
+      Im = im;
+   }
+
+   public void add(Complex c) {
+      Re += c.Re;
+      Im += c.Im;
+   }
+
+   public void subtract(Complex c) {
+      Re -= c.Re;
+      Im -= c.Im;
+   }
+
+   public void multiply(Complex c) {
+      double re = Re*c.Re-Im*c.Im;
+      double im = Re*c.Im+Im*c.Re;
+      Re = re;
+      Im = im;
+   }
+
+   public void divide(Complex c) {
+      double k = c.Re*c.Re+c.Im*c.Im;
+      if( k == 0 )
+         throw new ArithmeticException( "can't divide by zero" );
+      double re = Re*c.Re+Im*c.Im;
+      double im = Im*c.Re-Re*c.Im;
+      Re = re / k;
+      Im = im / k;
+   }
+
+   public double sqrmod() {
+      return Re*Re+Im*Im;
+   }
+
+   public static Complex valueOf(double x) {
+      return new Complex(x, 0);
+   }
+} // end class Complex
+
+class MandelbrotFractal extends Fractal
+{
+   private static final int MaxIterations = 511;
+   private BufferedImage image;
+
+   public MandelbrotFractal(int w, int h,
+         double minX, double maxX, double minY, double maxY) {
+      image = new BufferedImage(w, h, BufferedImage.TYPE_INT_RGB);
+      double stepX = (maxX - minX) / (double) w;
+      double stepY = (maxY - minY) / (double) h;
+      double y = minY;
+      for( int j=0; j<h; j++ )
+      {
+         double x = minX;
+         for( int i=0; i<w; i++ )
+         {
+            image.setRGB(i, j, getColor(x, y));
+            x += stepX;
+         } // end inner for
+         y += stepY;
+      } // end outer for
+   }// end constructor
+
+   @Override
+   public BufferedImage getImage()
+   {
+      return image;
+   } // end method getImage
+
+   private int getColor( double x, double y ) {
+      // C = (x+yi)
+      Complex C = new Complex( x, y );
+      // Z = (0+0i)
+      Complex Z = Complex.valueOf( 0 );
+      int i;
+      for( i = 0; i < MaxIterations; i++ ) {
+         // 0: (0+0i)(0+0i) = (0+0i)
+         // 1: (x+yi)(x+yi) = xx+xyi+xyi-yy = (xx-yy, 2xyi)
+         Z.multiply( Z ); // ineffective computations
+         // 0: (0+0i)+(x+yi) = (x+yi)
+         // 1: (xx-yy+x, (2xy+y)i)
+         Z.add( C );
+         // 0: x*x+y*y > 4
+         if( Z.sqrmod() > 4 )
+            break;
+      }
+      return 8*(MaxIterations-i);
+   } // end method getColor
+} // end class MandelbrotFractal
+
+class NewtonFractal extends Fractal
+{
+   private BufferedImage image;
+
+   public NewtonFractal(int w, int h) {
+      image = new BufferedImage(w, h, BufferedImage.TYPE_INT_RGB);
+      // minX = -1, maxX = 1, dx = 1-(-1)=2
+      // minY = -1, maxY = 1, dy = 1-(-1)=2
+      double dx = ((double) 2) / 400, x0 = -1;
+      double dy = -((double) 2) / 400, y0 = 1;
+
+      double x, y;
+      int i, j;
+      for(i=0, y=y0; i<400; i++, y+=dy)
+         for(j=0, x=x0; j<400; j++, x+=dx)
+            image.setRGB(j, i, getColor(x, y));
+   }// end constructor
+
+   @Override
+   public BufferedImage getImage()
+   {
+      return image;
+   } // end method getImage
+
+   private int getColor( double x, double y ) {
+      Complex Z = new Complex( x, y );
+      int i;
+      for( i = 0; i < 511; i++ ) {
+         Z = nextValue( Z );
+         if( checkCondition( Z ) )
+            break;
+      }
+      return 8*(511-i);
+   } // end method getColor
+
+   // Zk = ( 3 * Z^4 + 1 ) / ( 4 * Z^3 )
+   private Complex nextValue( Complex Z )
+   {
+      Complex z4 = new Complex( Z );
+      z4.multiply( z4 );
+
+         Complex z3 = new Complex( z4 );
+         z3.multiply( Z );
+         z3.multiply( Complex.valueOf( 4 ) );
+
+      z4.multiply( z4 );
+      z4.multiply( Complex.valueOf( 3 ) );
+      z4.add( Complex.valueOf( 1 ) );
+      try {
+         z4.divide( z3 );
+      } catch( ArithmeticException e ) {
+         z4 = new Complex( 65536, 0 );
+      }
+      return z4;
+   } // end method nextValue
+
+   // while |Z^4 - 1| ^ 2 > 0.001
+   private boolean checkCondition( Complex Z )
+   {
+      Complex z = new Complex( Z );
+      z.multiply( z );
+      z.multiply( z );
+      z.subtract( Complex.valueOf( 1 ) );
+      double x = z.sqrmod();
+      return ( x > 0.001 )? false : true ;
+   } // end method checkCondition
+} // end class NewtonFractal
